@@ -24,10 +24,7 @@
  */
 package site.ycsb.db;
 
-import com.mongodb.MongoClient;
-import com.mongodb.MongoClientURI;
-import com.mongodb.ReadPreference;
-import com.mongodb.WriteConcern;
+import com.mongodb.*;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
@@ -101,6 +98,8 @@ public class MongoDbClient extends DB {
 
   /** The default write concern for the test. */
   private static WriteConcern writeConcern;
+
+  private static ReadConcern readConcern;
 
   /** The batch size to use for inserts. */
   private static int batchSize;
@@ -218,12 +217,14 @@ public class MongoDbClient extends DB {
 
         readPreference = uri.getOptions().getReadPreference();
         writeConcern = uri.getOptions().getWriteConcern();
+        readConcern = uri.getOptions().getReadConcern();
 
         mongoClient = new MongoClient(uri);
         database =
             mongoClient.getDatabase(databaseName)
                 .withReadPreference(readPreference)
-                .withWriteConcern(writeConcern);
+                .withWriteConcern(writeConcern)
+                .withReadConcern(readConcern);
 
         System.out.println("mongo client connection created with " + url);
       } catch (Exception e1) {
@@ -321,7 +322,7 @@ public class MongoDbClient extends DB {
       MongoCollection<Document> collection = database.getCollection(table);
       Document query = new Document("_id", key);
 
-      FindIterable<Document> findIterable = collection.find(query);
+      FindIterable<Document> findIterable = collection.withReadConcern(readConcern).find(query);
 
       if (fields != null) {
         Document projection = new Document();
@@ -366,7 +367,7 @@ public class MongoDbClient extends DB {
       Set<String> fields, Vector<HashMap<String, ByteIterator>> result) {
     MongoCursor<Document> cursor = null;
     try {
-      MongoCollection<Document> collection = database.getCollection(table);
+      MongoCollection<Document> collection = database.getCollection(table).withReadConcern(readConcern);
 
       Document scanRange = new Document("$gte", startkey);
       Document query = new Document("_id", scanRange);
